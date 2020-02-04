@@ -244,6 +244,139 @@ files:
         }
     }
   learner_created: false
+- name: src/blockchain/StringUtil.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import java.nio.charset.StandardCharsets;
+    import java.security.MessageDigest;
+
+    class StringUtil {
+        /* Applies Sha256 to a string and returns a hash. */
+        public static String applySha256(String input) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                /* Applies sha256 to our input */
+                byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+                StringBuilder hexString = new StringBuilder();
+                for (byte elem : hash) {
+                    String hex = Integer.toHexString(0xff & elem);
+                    if (hex.length() == 1) hexString.append('0');
+                    hexString.append(hex);
+                }
+                return hexString.toString();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+  learner_created: true
+- name: src/blockchain/BlockFactory.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/Block.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/BaseBlock.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/SimpleBlock.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import java.util.StringJoiner;
+
+    public class Block {
+        public final int id;
+        public final long timestamp;
+        public final String hash;
+        public final String previous;
+
+        public Block(int id, long timestamp, String hash) {
+            this(id, timestamp, hash, "0");
+        }
+
+        public Block(int id, long timestamp, String hash, String previous) {
+            this.id = id;
+            this.timestamp = timestamp;
+            this.hash = hash;
+            this.previous = previous;
+        }
+
+        @Override
+        public String toString() {
+            return new StringJoiner("\n")
+                    .add("Block:")
+                    .add("Id: " + id)
+                    .add("Timestamp: " + timestamp)
+                    .add("Hash of the previous block:")
+                    .add(previous)
+                    .add("Hash of the block:")
+                    .add(hash)
+                    .toString();
+        }
+    }
+  learner_created: true
+- name: src/blockchain/SimpleBlockFactory.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/SimpleBlockchain.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import java.util.ArrayDeque;
+    import java.util.Date;
+    import java.util.Deque;
+    import java.util.StringJoiner;
+
+    public class Blockchain {
+        private final Deque<Block> blocks = new ArrayDeque<>();
+
+        private int blockId = 1;
+
+        public void generateNewBlock() {
+            Block last = getLast();
+            Block next;
+            if (last == null) {
+                next = new Block(getId(), getTimestamp(), getHash());
+            } else {
+                next = new Block(getId(), getTimestamp(), getHash(), last.hash);
+            }
+            blocks.add(next);
+        }
+
+        protected Block getLast() {
+            return blocks.peekLast();
+        }
+
+        protected int getId() {
+            return blockId++;
+        }
+
+        protected long getTimestamp() {
+            return new Date().getTime();
+        }
+
+        protected String getHash() {
+            return StringUtil.applySha256(String.valueOf(new Date().getTime() + blockId));
+        }
+
+        @Override
+        public String toString() {
+            StringJoiner joiner = new StringJoiner("\n\n");
+            for (Block block : blocks) {
+                joiner.add(block.toString());
+            }
+            return joiner.toString();
+        }
+    }
+  learner_created: true
+- name: src/blockchain/Blockchain.java
+  visible: true
+  learner_created: true
 feedback_link: https://hyperskill.org/projects/50/stages/272/implement
-status: Unchecked
+status: Solved
 record: -1
