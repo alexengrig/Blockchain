@@ -239,6 +239,140 @@ files:
         }
     }
   learner_created: false
+- name: src/blockchain/Blockchain.java
+  visible: true
+  text: |
+    package blockchain;
+
+    public interface Blockchain {
+        Block generateNewBlock();
+    }
+  learner_created: true
+- name: src/blockchain/block/Block.java
+  visible: true
+  text: |
+    package blockchain;
+
+    public interface Block {
+        int getId();
+
+        long getTimestamp();
+
+        long getMagicNumber();
+
+        String getPreviousHash();
+
+        String getHash();
+    }
+  learner_created: true
+- name: src/blockchain/hash/HashFunction.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/hash/SHA256HashFunction.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import java.nio.charset.StandardCharsets;
+    import java.security.MessageDigest;
+
+    class StringUtil {
+        /* Applies Sha256 to a string and returns a hash. */
+        public static String applySha256(String input) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                /* Applies sha256 to our input */
+                byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+                StringBuilder hexString = new StringBuilder();
+                for (byte elem : hash) {
+                    String hex = Integer.toHexString(0xff & elem);
+                    if (hex.length() == 1) hexString.append('0');
+                    hexString.append(hex);
+                }
+                return hexString.toString();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+  learner_created: true
+- name: src/blockchain/hash/HashApprover.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/hash/NZerosHashApprover.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/mining/Miner.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/mining/ComputeMiner.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/NZeros.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/NZerosBlockchain.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import java.util.ArrayDeque;
+    import java.util.Deque;
+    import java.util.StringJoiner;
+
+    public class SimpleBlockchain implements Blockchain {
+        private final BlockFactory blockFactory;
+        private final Deque<Block> blocks;
+
+        public SimpleBlockchain(int n) {
+            blockFactory = new SimpleBlockFactory(n);
+            blocks = new ArrayDeque<>();
+        }
+
+        @Override
+        public Block generateNewBlock() {
+            Block block = blockFactory.generate();
+            blocks.add(block);
+            return block;
+        }
+
+        @Override
+        public String toString() {
+            StringJoiner joiner = new StringJoiner("\n\n");
+            for (Block block : blocks) {
+                joiner.add(block.toString());
+            }
+            return joiner.toString();
+        }
+    }
+  learner_created: true
+- name: src/blockchain/block/NZerosBlock.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/block/BlockParams.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/block/SimpleBlockParams.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/block/ImmutableBlock.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/block/PartBlockParams.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/block/ImmutablePartBlockParams.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/util/CommonUtils.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/mining/MinerParams.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/mining/SimpleMinerParams.java
+  visible: true
+  learner_created: true
 feedback_link: https://hyperskill.org/projects/50/stages/273/implement
-status: Unchecked
+status: Solved
 record: -1
