@@ -1,0 +1,1 @@
+Collectors.groupingBy(t -> t.getAccount().getNumber(), Collectors.summingLong(t -> t.getSum()))
