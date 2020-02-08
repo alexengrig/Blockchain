@@ -5,10 +5,12 @@ import java.util.StringJoiner;
 
 public class NZerosBlock extends ImmutableBlock {
     protected final String nStatus;
+    protected final String data;
 
-    public NZerosBlock(Block block, String nStatus) {
+    public NZerosBlock(Block block, String nStatus, String data) {
         super(block);
         this.nStatus = nStatus;
+        this.data = data;
     }
 
     @Override
@@ -17,12 +19,13 @@ public class NZerosBlock extends ImmutableBlock {
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         NZerosBlock that = (NZerosBlock) o;
-        return Objects.equals(nStatus, that.nStatus);
+        return Objects.equals(nStatus, that.nStatus) &&
+                Objects.equals(data, that.data);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), nStatus);
+        return Objects.hash(super.hashCode(), nStatus, data);
     }
 
     @Override
@@ -38,6 +41,7 @@ public class NZerosBlock extends ImmutableBlock {
                 .add("Hash of the block:")
                 .add(hash)
                 .add("Block was generating for " + runtime / 1000 + " seconds")
+                .add(String.format("Block data:%s", data.isBlank() ? " no messages" : "\n" + data))
                 .add(nStatus)
                 .toString();
     }

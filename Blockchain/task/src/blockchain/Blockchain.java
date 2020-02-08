@@ -10,4 +10,6 @@ public interface Blockchain {
     PartBlockParams getNextParams();
 
     boolean accept(Block block);
+
+    void include(String data);
 }

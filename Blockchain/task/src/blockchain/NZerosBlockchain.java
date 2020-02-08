@@ -18,12 +18,18 @@ public class NZerosBlockchain implements Blockchain {
     protected NZeros nZeros;
     protected NZerosHashApprover approver;
     protected PartBlockParams params;
+    protected StringJoiner dataStore;
 
     public NZerosBlockchain() {
         this.id = 0;
         this.nZeros = new NZeros(0);
+        prepareNext();
+    }
+
+    private void prepareNext() {
         this.approver = new NZerosHashApprover(nZeros.getCount());
-        this.params = new ImmutablePartBlockParams(id, getLastHash());
+        this.params = new ImmutablePartBlockParams(id++, getLastHash());
+        this.dataStore = new StringJoiner("\n");
     }
 
     @Override
@@ -42,22 +48,26 @@ public class NZerosBlockchain implements Blockchain {
         if (!previousHash.equals(block.getPreviousHash())) {
             return false;
         }
-        String nStatus = nZeros.getNextStatus();
-        NZerosBlock nextBlock = new NZerosBlock(block, nStatus);
-        blocks.add(nextBlock);
-        prepareNext();
+        synchronized (this) {
+            String nStatus = nZeros.getNextStatus();
+            String data = dataStore.toString();
+            NZerosBlock nextBlock = new NZerosBlock(block, nStatus, data);
+            blocks.add(nextBlock);
+            prepareNext();
+        }
         return true;
-    }
-
-    private void prepareNext() {
-        ++id;
-        approver = new NZerosHashApprover(nZeros.getCount());
-        params = new ImmutablePartBlockParams(id, getLastHash());
     }
 
     private String getLastHash() {
         Block last = blocks.peekLast();
         return last != null ? last.getHash() : "0";
+    }
+
+    @Override
+    public synchronized void include(String data) {
+        if (!blocks.isEmpty()) {
+            dataStore.add(data);
+        }
     }
 
     @Override
