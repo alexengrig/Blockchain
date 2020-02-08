@@ -42,11 +42,6 @@ class Block {
             .filter(e -> e.length() > 0)
             .collect(Collectors.toList());
 
-        if (lines.size() != 11) {
-            throw new BlockParseException("Every block should " +
-                "contain 11 lines of data");
-        }
-
         if (!lines.get(0).equals("Block:")) {
             throw new BlockParseException("First line of every block " +
                 "should be \"Block:\"");
