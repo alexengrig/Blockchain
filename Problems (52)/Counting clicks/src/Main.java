@@ -1,0 +1,1 @@
+Collectors.groupingBy(e->e.url, Collectors.counting())
