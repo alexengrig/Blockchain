@@ -1,0 +1,1 @@
+Collectors.reducing(1, (l, r) -> l * r * r)
