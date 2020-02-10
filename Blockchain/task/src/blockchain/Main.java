@@ -1,7 +1,8 @@
 package blockchain;
 
 import blockchain.block.Block;
-import blockchain.data.DataProducer;
+import blockchain.data.SignedData;
+import blockchain.data.SignedMessageProducer;
 import blockchain.hash.HashApprover;
 import blockchain.hash.HashFunction;
 import blockchain.hash.SHA256HashFunction;
@@ -25,10 +26,12 @@ public class Main {
     );
 
     public static void main(String[] args) throws ExecutionException, InterruptedException {
-        final Blockchain blockchain = new NZerosBlockchain();
+        final Blockchain<Block, SignedData> blockchain = new NZerosBlockchain();
         final ExecutorService dataExecutorService = Executors.newFixedThreadPool(NUMBER_OF_PRODUCERS);
         for (int i = 0; i < NUMBER_OF_PRODUCERS; i++) {
-            dataExecutorService.execute(new DataProducer("Data producer # " + i, TEXTS, blockchain::include));
+            String name = "Data producer # " + i;
+            Runnable producer = new SignedMessageProducer(name, TEXTS, blockchain::store, blockchain::getNextDataParams);
+            dataExecutorService.execute(producer);
         }
         final ExecutorService minerExecutorService = Executors.newFixedThreadPool(NUMBER_OF_MINERS);
         final HashFunction hashFunction = new SHA256HashFunction();
@@ -37,7 +40,7 @@ public class Main {
         for (int count = 0; count < NUMBER_OF_BLOCKS; count++) {
             final HashApprover hashApprover = blockchain.getApprover();
             minerParams.setHashApprover(hashApprover);
-            minerParams.setBlockParams(blockchain.getNextParams());
+            minerParams.setBlockParams(blockchain.getNextBlockParams());
             final List<Callable<Block>> tasks = new ArrayList<>(NUMBER_OF_MINERS);
             for (int j = 0; j < NUMBER_OF_MINERS; j++) {
                 minerParams.setName("# " + j);
@@ -45,7 +48,7 @@ public class Main {
                 tasks.add(miner::mine);
             }
             final Block block = minerExecutorService.invokeAny(tasks);
-            if (!blockchain.accept(block)) {
+            if (!blockchain.include(block)) {
                 --count;
             }
         }

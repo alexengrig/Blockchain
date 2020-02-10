@@ -4,32 +4,43 @@ import blockchain.block.Block;
 import blockchain.block.ImmutablePartBlockParams;
 import blockchain.block.NZerosBlock;
 import blockchain.block.PartBlockParams;
+import blockchain.data.Data;
+import blockchain.data.DataParams;
+import blockchain.data.ImmutableDataParams;
+import blockchain.data.SignedData;
 import blockchain.hash.HashApprover;
 import blockchain.hash.NZerosHashApprover;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.StringJoiner;
+import java.util.*;
 
-public class NZerosBlockchain implements Blockchain {
-    protected final Deque<Block> blocks = new ArrayDeque<>();
-
-    protected long id;
+public class NZerosBlockchain implements Blockchain<Block, SignedData> {
+    protected final Deque<Block> blocks;
+    protected final Deque<SignedData> dataSet;
+    protected final Object lock = new Object();
+    protected long blockId;
+    protected long dataId;
     protected NZeros nZeros;
     protected NZerosHashApprover approver;
-    protected PartBlockParams params;
-    protected StringJoiner dataStore;
+    protected PartBlockParams blockParams;
 
     public NZerosBlockchain() {
-        this.id = 0;
-        this.nZeros = new NZeros(0);
+        blocks = new ArrayDeque<>();
+        dataSet = new ArrayDeque<>();
+        blockId = 1;
+        dataId = 1;
+        nZeros = new NZeros(0);
         prepareNext();
     }
 
-    private void prepareNext() {
-        this.approver = new NZerosHashApprover(nZeros.getCount());
-        this.params = new ImmutablePartBlockParams(id++, getLastHash());
-        this.dataStore = new StringJoiner("\n");
+    protected void prepareNext() {
+        dataSet.clear();
+        approver = new NZerosHashApprover(nZeros.getCount());
+        blockParams = new ImmutablePartBlockParams(blockId++, getLastHash());
+    }
+
+    protected String getLastHash() {
+        Block last = blocks.peekLast();
+        return last != null ? last.getHash() : "0";
     }
 
     @Override
@@ -38,35 +49,47 @@ public class NZerosBlockchain implements Blockchain {
     }
 
     @Override
-    public PartBlockParams getNextParams() {
-        return params;
+    public PartBlockParams getNextBlockParams() {
+        return blockParams;
     }
 
     @Override
-    public boolean accept(Block block) {
-        String previousHash = getLastHash();
-        if (!previousHash.equals(block.getPreviousHash())) {
-            return false;
-        }
-        synchronized (this) {
+    public synchronized DataParams getNextDataParams() {
+        return new ImmutableDataParams(dataId++);
+    }
+
+    @Override
+    public boolean include(Block block) {
+        synchronized (lock) {
+            String previousHash = getLastHash();
+            if (!previousHash.equals(block.getPreviousHash())) {
+                return false;
+            }
             String nStatus = nZeros.getNextStatus();
-            String data = dataStore.toString();
+            List<Data> data = new ArrayList<>(dataSet);
             NZerosBlock nextBlock = new NZerosBlock(block, nStatus, data);
             blocks.add(nextBlock);
             prepareNext();
+            lock.notifyAll();
         }
         return true;
     }
 
-    private String getLastHash() {
-        Block last = blocks.peekLast();
-        return last != null ? last.getHash() : "0";
-    }
-
     @Override
-    public synchronized void include(String data) {
-        if (!blocks.isEmpty()) {
-            dataStore.add(data);
+    public boolean store(SignedData data) {
+        synchronized (lock) {
+            while (blocks.isEmpty()) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    return false;
+                }
+            }
+            if (data.getId() >= blockId) {
+                return dataSet.add(data);
+            } else {
+                return false;
+            }
         }
     }
 
