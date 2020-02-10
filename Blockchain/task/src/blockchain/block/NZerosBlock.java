@@ -1,16 +1,20 @@
 package blockchain.block;
 
+import blockchain.data.Data;
+
+import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 public class NZerosBlock extends ImmutableBlock {
     protected final String nStatus;
-    protected final String data;
+    protected final List<Data> dataSet;
 
-    public NZerosBlock(Block block, String nStatus, String data) {
+    public NZerosBlock(Block block, String nStatus, List<Data> dataSet) {
         super(block);
         this.nStatus = nStatus;
-        this.data = data;
+        this.dataSet = dataSet;
     }
 
     @Override
@@ -20,12 +24,12 @@ public class NZerosBlock extends ImmutableBlock {
         if (!super.equals(o)) return false;
         NZerosBlock that = (NZerosBlock) o;
         return Objects.equals(nStatus, that.nStatus) &&
-                Objects.equals(data, that.data);
+                Objects.equals(dataSet, that.dataSet);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), nStatus, data);
+        return Objects.hash(super.hashCode(), nStatus, dataSet);
     }
 
     @Override
@@ -40,8 +44,10 @@ public class NZerosBlock extends ImmutableBlock {
                 .add(previousHash)
                 .add("Hash of the block:")
                 .add(hash)
+                .add(String.format("Block data:%s", dataSet.isEmpty()
+                        ? " no messages"
+                        : "\n" + dataSet.stream().map(Objects::toString).collect(Collectors.joining("\n"))))
                 .add("Block was generating for " + runtime / 1000 + " seconds")
-                .add(String.format("Block data:%s", data.isBlank() ? " no messages" : "\n" + data))
                 .add(nStatus)
                 .toString();
     }
