@@ -8,10 +8,11 @@ import blockchain.hash.HashApprover;
 import blockchain.hash.HashFunction;
 
 import java.util.Random;
+import java.util.concurrent.Callable;
 
 import static blockchain.util.CommonUtils.getTimestamp;
 
-public class ComputeMiner implements Miner {
+public class ComputeMiner implements Miner, Callable<Block> {
     private final String name;
     private final HashFunction hashFunction;
     private final HashApprover hashApprover;
@@ -50,5 +51,10 @@ public class ComputeMiner implements Miner {
         params.setHash(hash);
         params.setOwner(name);
         return new ImmutableBlock(params);
+    }
+
+    @Override
+    public Block call() {
+        return mine();
     }
 }

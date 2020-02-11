@@ -10,24 +10,29 @@ import blockchain.data.ImmutableDataParams;
 import blockchain.data.SignedData;
 import blockchain.hash.HashApprover;
 import blockchain.hash.NZerosHashApprover;
+import blockchain.reward.Reward;
+import blockchain.reward.VirtualCoin;
+import blockchain.util.NZeros;
 
 import java.util.*;
 
-public class NZerosBlockchain implements Blockchain<Block, SignedData> {
+public class MyBlockchain implements Blockchain<Block, SignedData> {
     protected final Deque<Block> blocks;
     protected final Deque<SignedData> dataSet;
     protected final Object lock = new Object();
     protected long blockId;
     protected long dataId;
+    protected long reward;
     protected NZeros nZeros;
     protected NZerosHashApprover approver;
     protected PartBlockParams blockParams;
 
-    public NZerosBlockchain() {
+    public MyBlockchain() {
         blocks = new ArrayDeque<>();
         dataSet = new ArrayDeque<>();
         blockId = 1;
         dataId = 1;
+        reward = 100;
         nZeros = new NZeros(0);
         prepareNext();
     }
@@ -59,20 +64,21 @@ public class NZerosBlockchain implements Blockchain<Block, SignedData> {
     }
 
     @Override
-    public boolean include(Block block) {
+    public Reward include(Block block) {
         synchronized (lock) {
             String previousHash = getLastHash();
             if (!previousHash.equals(block.getPreviousHash())) {
-                return false;
+                return VirtualCoin.ZERO;
             }
             String nStatus = nZeros.getNextStatus();
             List<Data> data = new ArrayList<>(dataSet);
-            NZerosBlock nextBlock = new NZerosBlock(block, nStatus, data);
+            VirtualCoin coin = new VirtualCoin(reward);
+            NZerosBlock nextBlock = new NZerosBlock(block, nStatus, data, coin);
             blocks.add(nextBlock);
             prepareNext();
             lock.notifyAll();
         }
-        return true;
+        return new VirtualCoin(reward);
     }
 
     @Override

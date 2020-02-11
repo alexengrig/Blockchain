@@ -249,6 +249,1199 @@ files:
         }
     }
   learner_created: false
+- name: src/blockchain/block/ImmutablePartBlockParams.java
+  visible: true
+  text: |
+    package blockchain.block;
+
+    import java.util.Objects;
+
+    public class ImmutablePartBlockParams implements PartBlockParams {
+        protected final long id;
+        protected final String previousHash;
+
+        public ImmutablePartBlockParams(long id, String previousHash) {
+            this.id = id;
+            this.previousHash = previousHash;
+        }
+
+        @Override
+        public long getId() {
+            return id;
+        }
+
+        @Override
+        public String getPreviousHash() {
+            return previousHash;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ImmutablePartBlockParams that = (ImmutablePartBlockParams) o;
+            return id == that.id &&
+                    Objects.equals(previousHash, that.previousHash);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, previousHash);
+        }
+
+        @Override
+        public String toString() {
+            return "ImmutablePartBlockParams{" +
+                    "id=" + id +
+                    ", previousHash='" + previousHash + '\'' +
+                    '}';
+        }
+    }
+  learner_created: true
+- name: src/blockchain/util/RSACryptographer.java
+  visible: true
+  text: |
+    package blockchain.util;
+
+    import java.security.*;
+
+    public final class RSACryptographer implements Cryptographer {
+        private final Signature signature;
+
+        private RSACryptographer() {
+            try {
+                signature = Signature.getInstance("SHA1withRSA");
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        public static RSACryptographer getInstance() {
+            return Holder.INSTANCE;
+        }
+
+        @Override
+        public String sign(PrivateKey key, String text) throws InvalidKeyException, SignatureException {
+            signature.initSign(key);
+            signature.update(text.getBytes());
+            return new String(signature.sign());
+        }
+
+        @Override
+        public boolean verify(PublicKey key, String text) throws InvalidKeyException, SignatureException {
+            signature.initVerify(key);
+            return signature.verify(text.getBytes());
+        }
+
+        private static class Holder {
+            private static RSACryptographer INSTANCE = new RSACryptographer();
+        }
+    }
+  learner_created: true
+- name: src/blockchain/util/Cryptographer.java
+  visible: true
+  text: |
+    package blockchain.util;
+
+    import java.security.InvalidKeyException;
+    import java.security.PrivateKey;
+    import java.security.PublicKey;
+    import java.security.SignatureException;
+
+    public interface Cryptographer {
+        String sign(PrivateKey key, String text) throws InvalidKeyException, SignatureException;
+
+        boolean verify(PublicKey key, String text) throws InvalidKeyException, SignatureException;
+    }
+  learner_created: true
+- name: src/blockchain/block/NZerosBlock.java
+  visible: true
+  text: |
+    package blockchain.block;
+
+    import blockchain.data.Data;
+
+    import java.util.List;
+    import java.util.Objects;
+    import java.util.StringJoiner;
+    import java.util.stream.Collectors;
+
+    public class NZerosBlock extends ImmutableBlock {
+        protected final String nStatus;
+        protected final List<Data> dataSet;
+
+        public NZerosBlock(Block block, String nStatus, List<Data> dataSet) {
+            super(block);
+            this.nStatus = nStatus;
+            this.dataSet = dataSet;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            if (!super.equals(o)) return false;
+            NZerosBlock that = (NZerosBlock) o;
+            return Objects.equals(nStatus, that.nStatus) &&
+                    Objects.equals(dataSet, that.dataSet);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(super.hashCode(), nStatus, dataSet);
+        }
+
+        @Override
+        public String toString() {
+            return new StringJoiner("\n")
+                    .add("Block:")
+                    .add("Created by miner " + owner)
+                    .add("Id: " + id)
+                    .add("Timestamp: " + timestamp)
+                    .add("Magic number: " + magicNumber)
+                    .add("Hash of the previous block:")
+                    .add(previousHash)
+                    .add("Hash of the block:")
+                    .add(hash)
+                    .add(String.format("Block data:%s", dataSet.isEmpty()
+                            ? " no messages"
+                            : "\n" + dataSet.stream().map(Objects::toString).collect(Collectors.joining("\n"))))
+                    .add("Block was generating for " + runtime / 1000 + " seconds")
+                    .add(nStatus)
+                    .toString();
+        }
+    }
+  learner_created: true
+- name: src/blockchain/data/MessageProducer.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    import java.util.List;
+    import java.util.Random;
+    import java.util.concurrent.TimeUnit;
+    import java.util.concurrent.atomic.AtomicLong;
+    import java.util.function.Consumer;
+
+    public class MessageProducer<T extends Message> implements DataProducer<T>, Runnable {
+        protected static final AtomicLong idGenerator = new AtomicLong();
+
+        protected final String name;
+        protected final List<String> texts;
+        protected final Consumer<T> consumer;
+        protected final Random random;
+
+        public MessageProducer(String name, List<String> texts, Consumer<T> consumer) {
+            this.name = name;
+            this.texts = texts;
+            this.consumer = consumer;
+            this.random = new Random();
+        }
+
+        protected String say(String text) {
+            return name + ": " + text;
+        }
+
+        protected String getRandomText() {
+            return texts.get(random.nextInt(texts.size()));
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public T get() {
+            String text = getRandomText();
+            String message = say(text);
+            return (T) new Message(idGenerator.getAndIncrement(), message);
+        }
+
+        @Override
+        public void run() {
+            while (!Thread.currentThread().isInterrupted()) {
+                T data = get();
+                consumer.accept(data);
+                int timeout = random.nextInt(10);
+                try {
+                    TimeUnit.MILLISECONDS.sleep(timeout);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+    }
+  learner_created: true
+- name: src/blockchain/data/SignedMessage.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    import java.security.PublicKey;
+    import java.util.Objects;
+
+    public class SignedMessage extends Message implements SignedData {
+        protected final PublicKey key;
+        protected final String sign;
+
+        public SignedMessage(long id, String text, PublicKey key, String sign) {
+            super(id, text);
+            this.key = key;
+            this.sign = sign;
+        }
+
+        @Override
+        public PublicKey getKey() {
+            return key;
+        }
+
+        @Override
+        public String getSign() {
+            return sign;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            if (!super.equals(o)) return false;
+            SignedMessage that = (SignedMessage) o;
+            return Objects.equals(key, that.key) &&
+                    Objects.equals(sign, that.sign);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(super.hashCode(), key, sign);
+        }
+    }
+  learner_created: true
+- name: src/blockchain/mining/Miner.java
+  visible: true
+  text: |
+    package blockchain.mining;
+
+    import blockchain.block.Block;
+
+    @FunctionalInterface
+    public interface Miner {
+        Block mine();
+    }
+  learner_created: true
+- name: src/blockchain/hash/NZerosHashApprover.java
+  visible: true
+  text: |
+    package blockchain.hash;
+
+    public class NZerosHashApprover implements HashApprover {
+        private final String zeros;
+
+        public NZerosHashApprover(int n) {
+            this.zeros = "0".repeat(n);
+        }
+
+        @Override
+        public boolean approve(String hash) {
+            return hash.startsWith(zeros);
+        }
+    }
+  learner_created: true
+- name: src/blockchain/mining/SimpleMinerParams.java
+  visible: true
+  text: |
+    package blockchain.mining;
+
+    import blockchain.block.PartBlockParams;
+    import blockchain.hash.HashApprover;
+    import blockchain.hash.HashFunction;
+
+    public class SimpleMinerParams implements MinerParams {
+        private String name;
+        private HashFunction hashFunction;
+        private HashApprover hashApprover;
+        private PartBlockParams blockParams;
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public HashFunction getHashFunction() {
+            return hashFunction;
+        }
+
+        public void setHashFunction(HashFunction hashFunction) {
+            this.hashFunction = hashFunction;
+        }
+
+        @Override
+        public HashApprover getHashApprover() {
+            return hashApprover;
+        }
+
+        public void setHashApprover(HashApprover hashApprover) {
+            this.hashApprover = hashApprover;
+        }
+
+        @Override
+        public PartBlockParams getBlockParams() {
+            return blockParams;
+        }
+
+        public void setBlockParams(PartBlockParams blockParams) {
+            this.blockParams = blockParams;
+        }
+    }
+  learner_created: true
+- name: src/blockchain/data/SignedMessageProducer.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    import blockchain.util.KeysGenerator;
+    import blockchain.util.RSACryptographer;
+    import blockchain.util.RSAGenerator;
+
+    import java.security.InvalidKeyException;
+    import java.security.PrivateKey;
+    import java.security.PublicKey;
+    import java.security.SignatureException;
+    import java.util.List;
+    import java.util.function.Consumer;
+    import java.util.function.Supplier;
+
+    public class SignedMessageProducer extends MessageProducer<SignedMessage> {
+        protected final Supplier<DataParams> params;
+        protected final KeysGenerator keysGenerator;
+        protected final PublicKey publicKey;
+        protected final PrivateKey privateKey;
+
+        public SignedMessageProducer(String name, List<String> texts,
+                                     Consumer<SignedMessage> consumer, Supplier<DataParams> params) {
+            super(name, texts, consumer);
+            this.params = params;
+            this.keysGenerator = getKeysGenerator();
+            this.keysGenerator.generateKeys();
+            this.publicKey = keysGenerator.getPublicKey();
+            this.privateKey = keysGenerator.getPrivateKey();
+        }
+
+        protected KeysGenerator getKeysGenerator() {
+            return new RSAGenerator(1024);
+        }
+
+        @Override
+        public SignedMessage get() {
+            try {
+                DataParams dataParams = params.get();
+                long id = dataParams.getId();
+                String text = getRandomText();
+                String message = say(text);
+                String sign = RSACryptographer.getInstance().sign(privateKey, message);
+                return new SignedMessage(id, message, publicKey, sign);
+            } catch (InvalidKeyException | SignatureException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+  learner_created: true
+- name: src/blockchain/mining/MinerParams.java
+  visible: true
+  text: |
+    package blockchain.mining;
+
+    import blockchain.block.PartBlockParams;
+    import blockchain.hash.HashApprover;
+    import blockchain.hash.HashFunction;
+
+    public interface MinerParams {
+        String getName();
+
+        HashFunction getHashFunction();
+
+        HashApprover getHashApprover();
+
+        PartBlockParams getBlockParams();
+    }
+  learner_created: true
+- name: src/blockchain/util/RSAGenerator.java
+  visible: true
+  text: |
+    package blockchain.util;
+
+    import java.security.*;
+
+    public class RSAGenerator implements KeysGenerator {
+        private final KeyPairGenerator generator;
+        private PrivateKey privateKey;
+        private PublicKey publicKey;
+
+        public RSAGenerator(int length) {
+            try {
+                generator = KeyPairGenerator.getInstance("RSA");
+                generator.initialize(length);
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @Override
+        public void generateKeys() {
+            KeyPair pair = generator.generateKeyPair();
+            privateKey = pair.getPrivate();
+            publicKey = pair.getPublic();
+        }
+
+        @Override
+        public PrivateKey getPrivateKey() {
+            return privateKey;
+        }
+
+        @Override
+        public PublicKey getPublicKey() {
+            return publicKey;
+        }
+    }
+  learner_created: true
+- name: src/blockchain/block/Block.java
+  visible: true
+  text: |
+    package blockchain.block;
+
+    public interface Block {
+        long getId();
+
+        long getRuntime();
+
+        long getTimestamp();
+
+        long getMagicNumber();
+
+        String getHash();
+
+        String getPreviousHash();
+
+        String getOwner();
+    }
+  learner_created: true
+- name: src/blockchain/data/MessageProducerParams.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    public class MessageProducerParams {
+
+    }
+  learner_created: true
+- name: src/blockchain/data/DataProducer.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    @FunctionalInterface
+    public interface DataProducer<T extends Data> {
+        T get();
+    }
+  learner_created: true
+- name: src/blockchain/util/KeysGenerator.java
+  visible: true
+  text: |
+    package blockchain.util;
+
+    import java.security.PrivateKey;
+    import java.security.PublicKey;
+
+    public interface KeysGenerator {
+        void generateKeys();
+
+        PrivateKey getPrivateKey();
+
+        PublicKey getPublicKey();
+    }
+  learner_created: true
+- name: src/blockchain/block/ImmutableBlock.java
+  visible: true
+  text: |
+    package blockchain.block;
+
+    import java.util.Objects;
+
+    public class ImmutableBlock implements Block {
+        public static final ImmutableBlock EMPTY = new ImmutableBlock();
+
+        protected final long id;
+        protected final long timestamp;
+        protected final long runtime;
+        protected final long magicNumber;
+        protected final String hash;
+        protected final String previousHash;
+        protected final String owner;
+
+        private ImmutableBlock() {
+            this(-1, -1, -1, -1,
+                    "none", "none", "none");
+        }
+
+        public ImmutableBlock(BlockParams params) {
+            this.id = params.getId();
+            this.timestamp = params.getTimestamp();
+            this.runtime = params.getRuntime();
+            this.magicNumber = params.getMagicNumber();
+            this.hash = params.getHash();
+            this.previousHash = params.getPreviousHash();
+            this.owner = params.getOwner();
+        }
+
+        protected ImmutableBlock(Block block) {
+            this(block.getId(), block.getTimestamp(), block.getRuntime(), block.getMagicNumber(),
+                    block.getHash(), block.getPreviousHash(), block.getOwner());
+        }
+
+        protected ImmutableBlock(long id, long timestamp, long runtime, long magicNumber,
+                                 String hash, String previousHash, String owner) {
+            this.id = id;
+            this.timestamp = timestamp;
+            this.runtime = runtime;
+            this.magicNumber = magicNumber;
+            this.hash = hash;
+            this.previousHash = previousHash;
+            this.owner = owner;
+        }
+
+        @Override
+        public long getId() {
+            return id;
+        }
+
+        @Override
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        @Override
+        public long getRuntime() {
+            return runtime;
+        }
+
+        @Override
+        public long getMagicNumber() {
+            return magicNumber;
+        }
+
+        @Override
+        public String getHash() {
+            return hash;
+        }
+
+        @Override
+        public String getPreviousHash() {
+            return previousHash;
+        }
+
+        @Override
+        public String getOwner() {
+            return owner;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ImmutableBlock that = (ImmutableBlock) o;
+            return id == that.id &&
+                    timestamp == that.timestamp &&
+                    runtime == that.runtime &&
+                    magicNumber == that.magicNumber &&
+                    Objects.equals(hash, that.hash) &&
+                    Objects.equals(previousHash, that.previousHash) &&
+                    Objects.equals(owner, that.owner);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, timestamp, runtime, magicNumber, hash, previousHash, owner);
+        }
+
+        @Override
+        public String toString() {
+            return "ImmutableBlock{" +
+                    "id=" + id +
+                    ", timestamp=" + timestamp +
+                    ", runtime=" + runtime +
+                    ", magicNumber=" + magicNumber +
+                    ", hash='" + hash + '\'' +
+                    ", previousHash='" + previousHash + '\'' +
+                    ", owner='" + owner + '\'' +
+                    '}';
+        }
+    }
+  learner_created: true
+- name: src/blockchain/hash/SHA256HashFunction.java
+  visible: true
+  text: |
+    package blockchain.hash;
+
+    import java.nio.charset.StandardCharsets;
+    import java.security.MessageDigest;
+
+    public class SHA256HashFunction implements HashFunction {
+        @Override
+        public String hash(String input) {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+                StringBuilder hexString = new StringBuilder();
+                for (byte elem : hash) {
+                    String hex = Integer.toHexString(0xff & elem);
+                    if (hex.length() == 1) hexString.append('0');
+                    hexString.append(hex);
+                }
+                return hexString.toString();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+  learner_created: true
+- name: src/blockchain/data/Data.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    public interface Data {
+        long getId();
+    }
+  learner_created: true
+- name: src/blockchain/data/Message.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    import java.util.Objects;
+
+    public class Message implements Data {
+        protected final long id;
+        protected final String text;
+
+        public Message(long id, String text) {
+            this.id = id;
+            this.text = text;
+        }
+
+        @Override
+        public long getId() {
+            return id;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Message message = (Message) o;
+            return id == message.id &&
+                    Objects.equals(text, message.text);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, text);
+        }
+
+        @Override
+        public String toString() {
+            return text;
+        }
+    }
+  learner_created: true
+- name: src/blockchain/hash/HashFunction.java
+  visible: true
+  text: |
+    package blockchain.hash;
+
+    @FunctionalInterface
+    public interface HashFunction {
+        String hash(String input);
+
+        default String hash(long input) {
+            return hash(Long.toString(input));
+        }
+    }
+  learner_created: true
+- name: src/blockchain/util/CommonUtils.java
+  visible: true
+  text: |
+    package blockchain.util;
+
+    import java.util.Date;
+
+    public class CommonUtils {
+        public static long getTimestamp() {
+            return new Date().getTime();
+        }
+    }
+  learner_created: true
+- name: src/blockchain/block/SimpleBlockParams.java
+  visible: true
+  text: |
+    package blockchain.block;
+
+    import java.util.Objects;
+
+    public class SimpleBlockParams implements BlockParams {
+        protected long id;
+        protected long timestamp;
+        protected long runtime;
+        protected long magicNumber;
+        protected String hash;
+        protected String previousHash;
+        protected String owner;
+
+        public SimpleBlockParams(PartBlockParams params) {
+            this.id = params.getId();
+            this.previousHash = params.getPreviousHash();
+        }
+
+        @Override
+        public long getId() {
+            return id;
+        }
+
+        @Override
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public void setTimestamp(long timestamp) {
+            this.timestamp = timestamp;
+        }
+
+        @Override
+        public long getRuntime() {
+            return runtime;
+        }
+
+        public void setRuntime(long runtime) {
+            this.runtime = runtime;
+        }
+
+        @Override
+        public long getMagicNumber() {
+            return magicNumber;
+        }
+
+        public void setMagicNumber(long magicNumber) {
+            this.magicNumber = magicNumber;
+        }
+
+        @Override
+        public String getHash() {
+            return hash;
+        }
+
+        public void setHash(String hash) {
+            this.hash = hash;
+        }
+
+        @Override
+        public String getPreviousHash() {
+            return previousHash;
+        }
+
+        @Override
+        public String getOwner() {
+            return owner;
+        }
+
+        public void setOwner(String owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SimpleBlockParams that = (SimpleBlockParams) o;
+            return id == that.id &&
+                    timestamp == that.timestamp &&
+                    runtime == that.runtime &&
+                    magicNumber == that.magicNumber &&
+                    Objects.equals(hash, that.hash) &&
+                    Objects.equals(previousHash, that.previousHash) &&
+                    Objects.equals(owner, that.owner);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, timestamp, runtime, magicNumber, hash, previousHash, owner);
+        }
+
+        @Override
+        public String toString() {
+            return "SimpleBlockParams{" +
+                    "id=" + id +
+                    ", timestamp=" + timestamp +
+                    ", runtime=" + runtime +
+                    ", magicNumber=" + magicNumber +
+                    ", hash='" + hash + '\'' +
+                    ", previousHash='" + previousHash + '\'' +
+                    ", owner='" + owner + '\'' +
+                    '}';
+        }
+    }
+  learner_created: true
+- name: src/blockchain/Blockchain.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import blockchain.block.Block;
+    import blockchain.block.PartBlockParams;
+    import blockchain.data.Data;
+    import blockchain.data.DataParams;
+    import blockchain.hash.HashApprover;
+
+    public interface Blockchain<B extends Block, D extends Data> {
+        HashApprover getApprover();
+
+        PartBlockParams getNextBlockParams();
+
+        DataParams getNextDataParams();
+
+        boolean include(B block);
+
+        boolean store(D data);
+    }
+  learner_created: true
+- name: src/blockchain/data/DataParams.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    public interface DataParams {
+        long getId();
+    }
+  learner_created: true
+- name: src/blockchain/block/BlockParams.java
+  visible: true
+  text: |
+    package blockchain.block;
+
+    public interface BlockParams extends PartBlockParams {
+        long getTimestamp();
+
+        long getRuntime();
+
+        long getMagicNumber();
+
+        String getHash();
+
+        String getOwner();
+    }
+  learner_created: true
+- name: src/blockchain/data/SignedData.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    import java.security.PublicKey;
+
+    public interface SignedData extends Data {
+        String getSign();
+
+        PublicKey getKey();
+    }
+  learner_created: true
+- name: src/blockchain/mining/ComputeMiner.java
+  visible: true
+  text: |
+    package blockchain.mining;
+
+    import blockchain.block.Block;
+    import blockchain.block.ImmutableBlock;
+    import blockchain.block.PartBlockParams;
+    import blockchain.block.SimpleBlockParams;
+    import blockchain.hash.HashApprover;
+    import blockchain.hash.HashFunction;
+
+    import java.util.Random;
+
+    import static blockchain.util.CommonUtils.getTimestamp;
+
+    public class ComputeMiner implements Miner {
+        private final String name;
+        private final HashFunction hashFunction;
+        private final HashApprover hashApprover;
+        private final PartBlockParams blockParams;
+        private final Random random;
+
+        public ComputeMiner(MinerParams params) {
+            this.name = params.getName();
+            this.hashFunction = params.getHashFunction();
+            this.hashApprover = params.getHashApprover();
+            this.blockParams = params.getBlockParams();
+            this.random = getRandom();
+        }
+
+        protected Random getRandom() {
+            return new Random();
+        }
+
+        @Override
+        public Block mine() {
+            long magicNumber;
+            String hash;
+            long start = getTimestamp();
+            do {
+                magicNumber = random.nextLong();
+                hash = hashFunction.hash(magicNumber);
+                if (Thread.currentThread().isInterrupted()) {
+                    return ImmutableBlock.EMPTY;
+                }
+            } while (!hashApprover.approve(hash));
+            long end = getTimestamp();
+            SimpleBlockParams params = new SimpleBlockParams(blockParams);
+            params.setTimestamp(getTimestamp());
+            params.setRuntime(end - start);
+            params.setMagicNumber(magicNumber);
+            params.setHash(hash);
+            params.setOwner(name);
+            return new ImmutableBlock(params);
+        }
+    }
+  learner_created: true
+- name: src/blockchain/hash/HashApprover.java
+  visible: true
+  text: |
+    package blockchain.hash;
+
+    @FunctionalInterface
+    public interface HashApprover {
+        boolean approve(String hash);
+    }
+  learner_created: true
+- name: src/blockchain/data/ImmutableDataParams.java
+  visible: true
+  text: |
+    package blockchain.data;
+
+    import java.util.Objects;
+
+    public class ImmutableDataParams implements DataParams {
+        protected final long id;
+
+        public ImmutableDataParams(long id) {
+            this.id = id;
+        }
+
+        @Override
+        public long getId() {
+            return id;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ImmutableDataParams that = (ImmutableDataParams) o;
+            return id == that.id;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id);
+        }
+
+        @Override
+        public String toString() {
+            return "ImmutableDataParams{" +
+                    "id=" + id +
+                    '}';
+        }
+    }
+  learner_created: true
+- name: src/blockchain/block/PartBlockParams.java
+  visible: true
+  text: |
+    package blockchain.block;
+
+    public interface PartBlockParams {
+        long getId();
+
+        String getPreviousHash();
+    }
+  learner_created: true
+- name: src/blockchain/util/NZeros.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import java.util.Random;
+
+    public class NZeros {
+        Random random;
+        private int count;
+        private int increasedCount;
+        private int decreasedCount;
+
+        public NZeros(int count) {
+            this.count = count;
+            random = new Random();
+            increasedCount = 0;
+            decreasedCount = 0;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        public String getNextStatus() {
+            int variant = random.nextInt(10);
+            if (count > 0 && variant == 3) {
+                --count;
+                increasedCount = 0;
+                return "N was decreased by " + ++decreasedCount;
+            } else if (variant == 6) {
+                increasedCount = 0;
+                decreasedCount = 0;
+                return "N stays the same";
+            } else {
+                ++count;
+                decreasedCount = 0;
+                return "N was increased to " + ++increasedCount;
+            }
+        }
+    }
+  learner_created: true
+- name: src/blockchain/MyBlockchain.java
+  visible: true
+  text: |
+    package blockchain;
+
+    import blockchain.block.Block;
+    import blockchain.block.ImmutablePartBlockParams;
+    import blockchain.block.NZerosBlock;
+    import blockchain.block.PartBlockParams;
+    import blockchain.data.Data;
+    import blockchain.data.DataParams;
+    import blockchain.data.ImmutableDataParams;
+    import blockchain.data.SignedData;
+    import blockchain.hash.HashApprover;
+    import blockchain.hash.NZerosHashApprover;
+    import blockchain.util.Cryptographer;
+    import blockchain.util.KeysGenerator;
+    import blockchain.util.RSACryptographer;
+    import blockchain.util.RSAGenerator;
+    import org.jetbrains.annotations.NotNull;
+
+    import java.security.PrivateKey;
+    import java.security.PublicKey;
+    import java.util.*;
+
+    public class NZerosBlockchain implements Blockchain<Block, SignedData> {
+        protected final Deque<Block> blocks;
+        protected final Deque<SignedData> dataSet;
+        protected final Object lock = new Object();
+        protected long blockId;
+        protected long dataId;
+        protected NZeros nZeros;
+        protected NZerosHashApprover approver;
+        protected PartBlockParams blockParams;
+
+        public NZerosBlockchain() {
+            blocks = new ArrayDeque<>();
+            dataSet = new ArrayDeque<>();
+            blockId = 1;
+            dataId = 1;
+            nZeros = new NZeros(0);
+            prepareNext();
+        }
+
+        protected void prepareNext() {
+            dataSet.clear();
+            approver = new NZerosHashApprover(nZeros.getCount());
+            blockParams = new ImmutablePartBlockParams(blockId++, getLastHash());
+        }
+
+        protected String getLastHash() {
+            Block last = blocks.peekLast();
+            return last != null ? last.getHash() : "0";
+        }
+
+        @Override
+        public HashApprover getApprover() {
+            return approver;
+        }
+
+        @Override
+        public PartBlockParams getNextBlockParams() {
+            return blockParams;
+        }
+
+        @Override
+        public synchronized DataParams getNextDataParams() {
+            return new ImmutableDataParams(dataId++);
+        }
+
+        @Override
+        public boolean include(Block block) {
+            synchronized (lock) {
+                String previousHash = getLastHash();
+                if (!previousHash.equals(block.getPreviousHash())) {
+                    return false;
+                }
+                String nStatus = nZeros.getNextStatus();
+                List<Data> data = new ArrayList<>(dataSet);
+                NZerosBlock nextBlock = new NZerosBlock(block, nStatus, data);
+                blocks.add(nextBlock);
+                prepareNext();
+                lock.notifyAll();
+            }
+            return true;
+        }
+
+        @Override
+        public boolean store(SignedData data) {
+            synchronized (lock) {
+                while (blocks.isEmpty()) {
+                    try {
+                        lock.wait();
+                    } catch (InterruptedException e) {
+                        return false;
+                    }
+                }
+                if (data.getId() >= blockId) {
+                    return dataSet.add(data);
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        @Override
+        public String toString() {
+            StringJoiner joiner = new StringJoiner("\n\n");
+            for (Block block : blocks) {
+                joiner.add(block.toString());
+            }
+            return joiner.toString();
+        }
+    }
+  learner_created: true
+- name: src/blockchain/reward/Reward.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/reward/VirtualCoin.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/data/Transaction.java
+  visible: true
+  learner_created: true
+- name: src/blockchain/data/SignedTransaction.java
+  visible: true
+  learner_created: true
 feedback_link: https://hyperskill.org/projects/50/stages/276/implement
-status: Unchecked
+status: Solved
 record: -1
